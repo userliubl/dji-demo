@@ -1,0 +1,32 @@
+# Build
+build/
+cmake-build-*/
+
+# Binaries & libs
+*.o
+*.a
+*.so
+*.so.*
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+Logs/
+*.log
+
+# Secrets
+**/dji_sdk_app_info.h
+**/dji_sdk_config.json
+
+# Large assets
+**/*.stp
+**/*.pdf
+**/frozen_inference_graph.pb
