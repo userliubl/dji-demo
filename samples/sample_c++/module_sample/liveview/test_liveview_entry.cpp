@@ -24,6 +24,8 @@
 
 /* Includes ------------------------------------------------------------------*/
 #include <iostream>
+#include <stdio.h>
+#include <termios.h>
 #include <dji_logger.h>
 #include "test_liveview_entry.hpp"
 #include "test_liveview.hpp"
@@ -72,12 +74,30 @@ static void DjiUser_ShowRgbImageCallback(CameraRGBImage img, void *userData);
 static T_DjiReturnCode DjiUser_GetCurrentFileDirPath(const char *filePath, uint32_t pathBufferSize, char *dirPath);
 
 /* Exported functions definition ---------------------------------------------*/
+
+static int DjiUser_ScanKeyboardInput(void)
+{
+    int input;
+    struct termios newSettings;
+    struct termios storedSettings;
+
+    tcgetattr(0, &storedSettings);
+    newSettings = storedSettings;
+    newSettings.c_lflag &= (~ICANON);
+    newSettings.c_cc[VTIME] = 0;
+    newSettings.c_cc[VMIN] = 1;
+    tcsetattr(0, TCSANOW, &newSettings);
+
+    input = getchar();
+    tcsetattr(0, TCSANOW, &storedSettings);
+
+    return input;
+}
+
 void DjiUser_RunCameraStreamViewSample()
 {
     char cameraIndexChar = 0;
     char demoIndexChar = 0;
-    char isQuit = 0;
-    CameraRGBImage camImg;
     char fpvName[] = "FPV_CAM";
     char mainName[] = "MAIN_CAM";
     char viceName[] = "VICE_CAM";
@@ -131,12 +151,16 @@ void DjiUser_RunCameraStreamViewSample()
          << endl;
     cin >> cameraIndexChar;
 
+    E_DjiLiveViewCameraSource currentSource = DJI_LIVEVIEW_CAMERA_SOURCE_DEFAULT;
+
     switch (cameraIndexChar) {
         case '0':
             liveviewSample->StartFpvCameraStream(&DjiUser_ShowRgbImageCallback, &fpvName);
             break;
         case '1':
-            liveviewSample->StartMainCameraStream(&DjiUser_ShowRgbImageCallback, &mainName);
+            currentSource = DJI_LIVEVIEW_CAMERA_SOURCE_H20T_WIDE;
+            liveviewSample->StartMainCameraStreamBySource(currentSource,
+                                                           &DjiUser_ShowRgbImageCallback, &mainName);
             break;
         case '2':
             liveviewSample->StartViceCameraStream(&DjiUser_ShowRgbImageCallback, &viceName);
@@ -150,13 +174,47 @@ void DjiUser_RunCameraStreamViewSample()
             return;
     }
 
-    cout << "Please enter the 'q' or 'Q' to quit camera stream view\n"
-         << endl;
+    if (cameraIndexChar == '1') {
+        cout << "\nStreaming H20T. Controls:\n"
+             << "--> [1] WIDE    [2] ZOOM    [3] IR    [q] Quit\n"
+             << endl;
+    } else {
+        cout << "\nPlease enter 'q' or 'Q' to quit camera stream view\n"
+             << endl;
+    }
 
     while (true) {
-        cin >> isQuit;
-        if (isQuit == 'q' || isQuit == 'Q') {
+        int key = DjiUser_ScanKeyboardInput();
+        if (key == EOF) {
+            continue;
+        }
+
+        if (key == 'q' || key == 'Q') {
             break;
+        }
+
+        if (cameraIndexChar == '1') {
+            E_DjiLiveViewCameraSource newSource = currentSource;
+            const char *sourceName = nullptr;
+
+            if (key == '1') {
+                newSource = DJI_LIVEVIEW_CAMERA_SOURCE_H20T_WIDE;
+                sourceName = "WIDE";
+            } else if (key == '2') {
+                newSource = DJI_LIVEVIEW_CAMERA_SOURCE_H20T_ZOOM;
+                sourceName = "ZOOM";
+            } else if (key == '3') {
+                newSource = DJI_LIVEVIEW_CAMERA_SOURCE_H20T_IR;
+                sourceName = "IR";
+            }
+
+            if (newSource != currentSource && sourceName) {
+                cout << "Switching to " << sourceName << "..." << endl;
+                liveviewSample->StopMainCameraStreamBySource(currentSource);
+                liveviewSample->StartMainCameraStreamBySource(newSource,
+                                                               &DjiUser_ShowRgbImageCallback, &mainName);
+                currentSource = newSource;
+            }
         }
     }
 
@@ -165,7 +223,7 @@ void DjiUser_RunCameraStreamViewSample()
             liveviewSample->StopFpvCameraStream();
             break;
         case '1':
-            liveviewSample->StopMainCameraStream();
+            liveviewSample->StopMainCameraStreamBySource(currentSource);
             break;
         case '2':
             liveviewSample->StopViceCameraStream();
@@ -174,9 +232,7 @@ void DjiUser_RunCameraStreamViewSample()
             liveviewSample->StopTopCameraStream();
             break;
         default:
-            cout << "No camera selected";
-            delete liveviewSample;
-            return;
+            break;
     }
 
     delete liveviewSample;

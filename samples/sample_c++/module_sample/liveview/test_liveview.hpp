@@ -52,6 +52,10 @@ public:
     T_DjiReturnCode StartMainCameraStream(CameraImageCallback callback, void *userData);
     T_DjiReturnCode StopMainCameraStream();
 
+    T_DjiReturnCode StartMainCameraStreamBySource(E_DjiLiveViewCameraSource source,
+                                                   CameraImageCallback callback, void *userData);
+    T_DjiReturnCode StopMainCameraStreamBySource(E_DjiLiveViewCameraSource source);
+
     T_DjiReturnCode StartViceCameraStream(CameraImageCallback callback, void *userData);
     T_DjiReturnCode StopViceCameraStream();
 
